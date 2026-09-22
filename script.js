@@ -67,7 +67,7 @@ function renderCategories() {
     grid.classList.add('categories-grid');
 
     const themes = [
-        { id: 'historia', title: 'Historia', img: '' },
+        { id: 'historia', title: 'Historia', img: 'img/historia.png' },
         { id: 'geografia', title: 'Geografía', img: '' },
         { id: 'ciencias', title: 'Ciencias', img: '' },
         { id: 'entretenimiento', title: 'Entretenimiento', img: '' }
