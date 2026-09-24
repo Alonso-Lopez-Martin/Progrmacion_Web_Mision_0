@@ -67,10 +67,10 @@ function renderCategories() {
     grid.classList.add('categories-grid');
 
     const themes = [
-        { id: 'historia', title: 'Historia', img: 'img/historia.png' },
-        { id: 'geografia', title: 'Geografía', img: '' },
-        { id: 'ciencias', title: 'Ciencias', img: '' },
-        { id: 'entretenimiento', title: 'Entretenimiento', img: '' }
+        { id: 'historia', title: 'Historia', img: 'img/icono_historia.png' },
+        { id: 'geografia', title: 'Geografía', img: 'img/icono_geografia.png' },
+        { id: 'ciencias', title: 'Ciencias', img: 'img/icono_ciencias.png' },
+        { id: 'entretenimiento', title: 'Entretenimiento', img: 'img/icono_entretenimiento.png' }
     ];
 
     themes.forEach(theme => {
