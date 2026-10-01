@@ -30,18 +30,24 @@ const quizData = {
     ]
 };
 
-// Variables globales
-let currentQuestions = [];
-let currentQuestionIndex = 0;
-let score = 0;
-let timerInterval;
+// 1. ENCAPSULACIÓN DE ESTADO
+const appState = {
+    questions: [],
+    currentIndex: 0,
+    score: 0,
+    timer: null,
+    fxContainer: null // Cacheo del selector de partículas
+};
 
 const appContainer = document.querySelector('#app-container');
 
 function clearApp() {
     appContainer.innerHTML = '';
-    const fx = document.getElementById('fx-container');
-    if (fx) fx.remove();
+    // Uso del selector cacheado para evitar consultas repetidas al DOM
+    if (appState.fxContainer) {
+        appState.fxContainer.remove();
+        appState.fxContainer = null;
+    }
 }
 
 function shuffleArray(array) {
@@ -58,7 +64,6 @@ function init() {
     setupDarkModeToggle();
 }
 
-// PANTALLA 1: Inicio
 function renderStartScreen() {
     clearApp();
     const section = document.createElement('section');
@@ -73,7 +78,7 @@ function renderStartScreen() {
     appContainer.appendChild(section);
 }
 
-// PANTALLA 2: Categorías
+// 2. DELEGACIÓN DE EVENTOS EN CATEGORÍAS (Eventos)
 function renderCategories() {
     clearApp();
     const grid = document.createElement('div');
@@ -89,6 +94,7 @@ function renderCategories() {
     themes.forEach(theme => {
         const figure = document.createElement('figure');
         figure.classList.add('category-card');
+        figure.dataset.categoryId = theme.id; // Data attribute para delegación
         
         const img = document.createElement('img');
         img.src = theme.img;
@@ -99,46 +105,46 @@ function renderCategories() {
 
         figure.appendChild(img);
         figure.appendChild(figcaption);
-        
-        // EVENTO con animación de giro
-        figure.addEventListener('click', (event) => {
-            // Añadir clase de giro y encogimiento al elemento pulsado
-            const targetFigure = event.currentTarget;
-            targetFigure.classList.add('spin-shrink');
-            
-            // Retrasar el inicio del quiz para que dé tiempo a ver la animación
-            setTimeout(() => {
-                startQuiz(theme.id);
-            }, 600); // 600ms coinciden con el tiempo de animación en CSS
-        });
-        
         grid.appendChild(figure);
+    });
+
+    // Un único event listener en el contenedor padre
+    grid.addEventListener('click', (event) => {
+        const targetFigure = event.target.closest('figure.category-card');
+        if (!targetFigure || targetFigure.classList.contains('spin-shrink')) return;
+
+        targetFigure.classList.add('spin-shrink');
+        const categoryId = targetFigure.dataset.categoryId;
+        
+        setTimeout(() => {
+            startQuiz(categoryId);
+        }, 600);
     });
 
     appContainer.appendChild(grid);
 }
 
 function startQuiz(categoryId) {
-    currentQuestions = shuffleArray(quizData[categoryId]).slice(0, 3);
-    currentQuestionIndex = 0;
-    score = 0;
+    appState.questions = shuffleArray(quizData[categoryId]).slice(0, 3);
+    appState.currentIndex = 0;
+    appState.score = 0;
     renderQuestion();
 }
 
-// PANTALLA 3: Pregunta
+// 3. DELEGACIÓN DE EVENTOS EN RESPUESTAS
 function renderQuestion() {
     clearApp();
-    if (currentQuestionIndex >= currentQuestions.length) {
+    if (appState.currentIndex >= appState.questions.length) {
         renderResults();
         return;
     }
 
-    const questionData = currentQuestions[currentQuestionIndex];
+    const questionData = appState.questions[appState.currentIndex];
     const quizContainer = document.createElement('section');
     quizContainer.classList.add('quiz-container', 'fade-in');
 
     const title = document.createElement('h2');
-    title.textContent = `Pregunta ${currentQuestionIndex + 1} de 3`;
+    title.textContent = `Pregunta ${appState.currentIndex + 1} de 3`;
 
     const timerDisplay = document.createElement('p');
     timerDisplay.classList.add('timer-text');
@@ -152,14 +158,20 @@ function renderQuestion() {
     const optionsContainer = document.createElement('div');
     optionsContainer.classList.add('options-container');
 
-    const optionButtons = [];
-
     questionData.options.forEach((opt, index) => {
         const btn = document.createElement('button');
         btn.textContent = opt;
-        btn.addEventListener('click', () => handleAnswer(index, questionData.answer, optionButtons, timerDisplay));
+        btn.dataset.index = index; // Data attribute para identificar la opción
         optionsContainer.appendChild(btn);
-        optionButtons.push(btn);
+    });
+
+    // Un único event listener para todas las opciones
+    optionsContainer.addEventListener('click', (event) => {
+        if (event.target.tagName !== 'BUTTON' || optionsContainer.dataset.locked === 'true') return;
+        optionsContainer.dataset.locked = 'true'; // Prevenir múltiples clicks
+
+        const selectedIndex = parseInt(event.target.dataset.index);
+        handleAnswer(selectedIndex, questionData.answer, optionsContainer, timerDisplay);
     });
 
     quizContainer.appendChild(title);
@@ -168,7 +180,7 @@ function renderQuestion() {
     quizContainer.appendChild(optionsContainer);
     appContainer.appendChild(quizContainer);
 
-    timerInterval = setInterval(() => {
+    appState.timer = setInterval(() => {
         timeLeft--;
         timerDisplay.textContent = `⏳ Tiempo restante: ${timeLeft}s`;
         
@@ -177,21 +189,24 @@ function renderQuestion() {
         }
 
         if (timeLeft <= 0) {
-            clearInterval(timerInterval);
+            clearInterval(appState.timer);
             timerDisplay.textContent = "¡Tiempo agotado!";
-            handleAnswer(-1, questionData.answer, optionButtons, timerDisplay);
+            optionsContainer.dataset.locked = 'true';
+            handleAnswer(-1, questionData.answer, optionsContainer, timerDisplay);
         }
     }, 1000);
 }
 
-function handleAnswer(selectedIndex, correctIndex, buttons, timerDisplay) {
-    clearInterval(timerInterval);
+function handleAnswer(selectedIndex, correctIndex, containerNode, timerDisplay) {
+    clearInterval(appState.timer);
 
+    const buttons = containerNode.querySelectorAll('button');
     buttons.forEach(btn => btn.disabled = true);
+    
     buttons[correctIndex].classList.add('btn-correct');
 
     if (selectedIndex === correctIndex) {
-        score++;
+        appState.score++;
         timerDisplay.textContent = "¡Correcto!";
     } else {
         if (selectedIndex !== -1) {
@@ -201,12 +216,11 @@ function handleAnswer(selectedIndex, correctIndex, buttons, timerDisplay) {
     }
 
     setTimeout(() => {
-        currentQuestionIndex++;
+        appState.currentIndex++;
         renderQuestion();
     }, 2000);
 }
 
-// PANTALLA 4: Resultados y 4 Tipos de Animaciones
 function renderResults() {
     clearApp();
 
@@ -217,29 +231,28 @@ function renderResults() {
     title.textContent = '¡Quiz Terminado!';
 
     const scoreText = document.createElement('p');
-    scoreText.textContent = `Has acertado ${score} de 3 preguntas.`;
+    scoreText.textContent = `Has acertado ${appState.score} de 3 preguntas.`;
     scoreText.classList.add('score-text');
 
     const feedback = document.createElement('p');
     feedback.classList.add('feedback-text');
     
-    // Asignación de animaciones y clases de color según nota
-    if (score === 3) {
+    if (appState.score === 3) {
         feedback.textContent = '¡Qué genio! Puntuación perfecta.';
-        feedback.classList.add('text-perfect'); // En lugar de style.color
-        createConfetti();
-    } else if (score === 2) {
+        feedback.classList.add('text-perfect');
+        createParticles('confetti-piece', 40);
+    } else if (appState.score === 2) {
         feedback.textContent = '¡Muy bien! Tienes un nivel estupendo.';
-        feedback.classList.add('text-good'); // En lugar de style.color
-        createStars();
-    } else if (score === 1) {
+        feedback.classList.add('text-good');
+        createParticles('star-piece', 25);
+    } else if (appState.score === 1) {
         feedback.textContent = 'Bueno... podría haber sido peor.';
-        feedback.classList.add('text-regular'); // En lugar de style.color
-        createLeaves();
+        feedback.classList.add('text-regular');
+        createParticles('leaf-piece', 20);
     } else {
         feedback.textContent = '¡Qué pena! Toca repasar un poco más.';
-        feedback.classList.add('text-bad'); // En lugar de style.color
-        createRain();
+        feedback.classList.add('text-bad');
+        createParticles('rain-drop', 60);
     }
 
     const btnRestart = document.createElement('button');
@@ -253,63 +266,30 @@ function renderResults() {
     appContainer.appendChild(resultsContainer);
 }
 
-// ----------------------------------------------------
-// CREADORES DE PARTÍCULAS DOM (4 Niveles)
-// ----------------------------------------------------
-function createConfetti() {
+// 4. UNIFICACIÓN DE SISTEMAS DE PARTÍCULAS
+function createParticles(className, count) {
     const container = document.createElement('div');
     container.id = 'fx-container';
-    for (let i = 0; i < 40; i++) {
+    appState.fxContainer = container; // Guardar referencia en el estado global
+
+    for (let i = 0; i < count; i++) {
         const piece = document.createElement('div');
-        piece.classList.add('confetti-piece');
-        piece.classList.add(`c-${Math.floor(Math.random() * 4) + 1}`);
+        piece.classList.add(className);
+        
+        // Agregar modificadores aleatorios compartidos
         piece.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
         piece.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
+        
+        // El confeti requiere lógica de color adicional
+        if (className === 'confetti-piece') {
+            piece.classList.add(`c-${Math.floor(Math.random() * 4) + 1}`);
+        }
+        
         container.appendChild(piece);
     }
     document.body.appendChild(container);
 }
 
-function createStars() {
-    const container = document.createElement('div');
-    container.id = 'fx-container';
-    for (let i = 0; i < 25; i++) {
-        const star = document.createElement('div');
-        star.classList.add('star-piece');
-        star.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
-        star.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
-        container.appendChild(star);
-    }
-    document.body.appendChild(container);
-}
-
-function createLeaves() {
-    const container = document.createElement('div');
-    container.id = 'fx-container';
-    for (let i = 0; i < 20; i++) {
-        const leaf = document.createElement('div');
-        leaf.classList.add('leaf-piece');
-        leaf.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
-        leaf.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
-        container.appendChild(leaf);
-    }
-    document.body.appendChild(container);
-}
-
-function createRain() {
-    const container = document.createElement('div');
-    container.id = 'fx-container';
-    for (let i = 0; i < 60; i++) {
-        const drop = document.createElement('div');
-        drop.classList.add('rain-drop');
-        drop.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
-        drop.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
-        container.appendChild(drop);
-    }
-    document.body.appendChild(container);
-}
-
-// Modo Oscuro
 function setupDarkModeToggle() {
     document.addEventListener('keydown', (event) => {
         if (event.key === 'm' || event.key === 'M') {
