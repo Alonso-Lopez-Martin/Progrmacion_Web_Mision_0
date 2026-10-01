@@ -1,4 +1,8 @@
-// Base de datos de preguntas
+// ==========================================
+// 1. BASE DE DATOS Y ESTADO GLOBAL
+// ==========================================
+
+// Base de datos estática de preguntas organizada por categorías.
 const quizData = {
     historia: [
         { q: "¿Qué tratado puso fin a la Guerra de los Treinta Años en 1648?", options: ["Paz de Westfalia", "Tratado de Versalles", "Tratado de Tordesillas", "Paz de Utrecht"], answer: 0 },
@@ -30,26 +34,56 @@ const quizData = {
     ]
 };
 
-// 1. ENCAPSULACIÓN DE ESTADO
+// Objeto global de estado: Mantiene un seguimiento centralizado de la partida actual
 const appState = {
-    questions: [],
-    currentIndex: 0,
-    score: 0,
-    timer: null,
-    fxContainer: null // Cacheo del selector de partículas
+    questions: [],      // Array de preguntas barajadas de la partida activa
+    currentIndex: 0,    // Índice de la pregunta mostrada en pantalla
+    score: 0,           // Puntuación acumulada
+    timer: null,        // Referencia del intervalo del reloj para limpiarlo de forma segura
+    fxContainer: null   // Referencia cacheada del contenedor de partículas (animaciones)
 };
 
 const appContainer = document.querySelector('#app-container');
 
+// ==========================================
+// 2. FUNCIONES HELPER (Utilidades)
+// ==========================================
+
+/**
+ * Función genérica para crear elementos del DOM.
+ * Aplica principios DRY (Don't Repeat Yourself) reduciendo la redundancia.
+ */
+function createNode(tag, options = {}) {
+    const el = document.createElement(tag);
+    if (options.id) el.id = options.id;
+    if (options.classes) el.className = options.classes; 
+    if (options.text) el.textContent = options.text;
+    if (options.src) el.src = options.src;
+    if (options.alt) el.alt = options.alt;
+    if (options.dataset) {
+        Object.entries(options.dataset).forEach(([key, value]) => {
+            el.dataset[key] = value;
+        });
+    }
+    return el;
+}
+
+/**
+ * Purga el contenedor principal para montar la siguiente vista.
+ * Destruye también los efectos visuales para evitar acumulación de nodos huérfanos.
+ */
 function clearApp() {
     appContainer.innerHTML = '';
-    // Uso del selector cacheado para evitar consultas repetidas al DOM
     if (appState.fxContainer) {
         appState.fxContainer.remove();
         appState.fxContainer = null;
     }
 }
 
+/**
+ * Algoritmo matemático Fisher-Yates para barajar arrays aleatoriamente.
+ * Evita el sesgo estadístico de sort(Math.random).
+ */
 function shuffleArray(array) {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -59,117 +93,121 @@ function shuffleArray(array) {
     return newArray;
 }
 
+// Inicia el flujo lógico general al cargar la página
 function init() {
     renderStartScreen();
     setupDarkModeToggle();
 }
 
+// ==========================================
+// 3. GENERADORES DE VISTAS (Lógica de Navegación)
+// ==========================================
+
+// Vista 1: Pantalla inicial de bienvenida
 function renderStartScreen() {
     clearApp();
-    const section = document.createElement('section');
-    section.id = 'start-screen';
-    section.classList.add('fade-in');
-
-    const btnStart = document.createElement('button');
-    btnStart.textContent = 'Empezar Juego';
+    const section = createNode('section', { id: 'start-screen', classes: 'fade-in' });
+    const btnStart = createNode('button', { text: 'Empezar Juego' });
+    
     btnStart.addEventListener('click', renderCategories);
-
     section.appendChild(btnStart);
     appContainer.appendChild(section);
 }
 
-// 2. DELEGACIÓN DE EVENTOS EN CATEGORÍAS (Eventos)
+// Vista 2: Selector visual de temas
 function renderCategories() {
     clearApp();
-    const grid = document.createElement('div');
-    grid.classList.add('categories-grid', 'fade-in');
+    const grid = createNode('div', { classes: 'categories-grid fade-in' });
 
     const themes = [
-        { id: 'historia', title: 'Historia', img: 'img/icono_historia.png' },
-        { id: 'geografia', title: 'Geografía', img: 'img/icono_geografia.png' },
-        { id: 'ciencias', title: 'Ciencias', img: 'img/icono_ciencias.png' },
-        { id: 'entretenimiento', title: 'Entretenimiento', img: 'img/icono_entretenimiento.png' }
+        { id: 'historia', title: 'Historia', img: '' },
+        { id: 'geografia', title: 'Geografía', img: '' },
+        { id: 'ciencias', title: 'Ciencias', img: '' },
+        { id: 'entretenimiento', title: 'Entretenimiento', img: '' }
     ];
 
+    // Construcción del DOM para cada tarjeta
     themes.forEach(theme => {
-        const figure = document.createElement('figure');
-        figure.classList.add('category-card');
-        figure.dataset.categoryId = theme.id; // Data attribute para delegación
-        
-        const img = document.createElement('img');
-        img.src = theme.img;
-        img.alt = `Imagen de ${theme.title}`;
-        
-        const figcaption = document.createElement('figcaption');
-        figcaption.textContent = theme.title;
+        const figure = createNode('figure', { classes: 'category-card', dataset: { categoryId: theme.id } });
+        const img = createNode('img', { src: theme.img, alt: `Imagen de ${theme.title}` });
+        const figcaption = createNode('figcaption', { text: theme.title });
 
         figure.appendChild(img);
         figure.appendChild(figcaption);
         grid.appendChild(figure);
     });
 
-    // Un único event listener en el contenedor padre
+    // Delegación de Eventos: Un solo listener en el contenedor padre
+    // en lugar de múltiples listeners, uno por tarjeta.
     grid.addEventListener('click', (event) => {
         const targetFigure = event.target.closest('figure.category-card');
+        
+        // Prevención de errores y clicks dobles durante la animación
         if (!targetFigure || targetFigure.classList.contains('spin-shrink')) return;
 
-        targetFigure.classList.add('spin-shrink');
+        targetFigure.classList.add('spin-shrink'); // Inicia animación de salida
         const categoryId = targetFigure.dataset.categoryId;
         
-        setTimeout(() => {
-            startQuiz(categoryId);
-        }, 600);
+        // Espera a que termine la transición CSS (600ms) antes de cargar la pregunta
+        setTimeout(() => startQuiz(categoryId), 600);
     });
 
     appContainer.appendChild(grid);
 }
 
+// Lógica intermedia: Configuración de la partida con programación defensiva
 function startQuiz(categoryId) {
-    appState.questions = shuffleArray(quizData[categoryId]).slice(0, 3);
+    const categoryData = quizData[categoryId];
+    
+    // Control de fallos: Si los datos de la categoría están dañados, retrocede al menú
+    if (!categoryData || !Array.isArray(categoryData) || categoryData.length === 0) {
+        console.error(`Error: Datos no encontrados para ${categoryId}`);
+        renderCategories(); 
+        return;
+    }
+
+    // Calcula el número de preguntas garantizando que nunca se pidan más de las que hay
+    const questionsToPlay = Math.min(3, categoryData.length);
+    
+    // Inicializa el estado para la nueva partida
+    appState.questions = shuffleArray(categoryData).slice(0, questionsToPlay);
     appState.currentIndex = 0;
     appState.score = 0;
     renderQuestion();
 }
 
-// 3. DELEGACIÓN DE EVENTOS EN RESPUESTAS
+// Vista 3: Interfaz principal del cuestionario
 function renderQuestion() {
     clearApp();
+    
+    // Condición de finalización de partida
     if (appState.currentIndex >= appState.questions.length) {
         renderResults();
         return;
     }
 
     const questionData = appState.questions[appState.currentIndex];
-    const quizContainer = document.createElement('section');
-    quizContainer.classList.add('quiz-container', 'fade-in');
-
-    const title = document.createElement('h2');
-    title.textContent = `Pregunta ${appState.currentIndex + 1} de 3`;
-
-    const timerDisplay = document.createElement('p');
-    timerDisplay.classList.add('timer-text');
+    const quizContainer = createNode('section', { classes: 'quiz-container fade-in' });
+    const title = createNode('h2', { text: `Pregunta ${appState.currentIndex + 1} de ${appState.questions.length}` });
+    
+    // Estructura del temporizador
     let timeLeft = 60;
-    timerDisplay.textContent = `⏳ Tiempo restante: ${timeLeft}s`;
+    const timerDisplay = createNode('p', { classes: 'timer-text', text: `⏳ Tiempo restante: ${timeLeft}s` });
+    const questionText = createNode('p', { classes: 'question-text', text: questionData.q });
+    const optionsContainer = createNode('div', { classes: 'options-container' });
 
-    const questionText = document.createElement('p');
-    questionText.textContent = questionData.q;
-    questionText.classList.add('question-text');
-
-    const optionsContainer = document.createElement('div');
-    optionsContainer.classList.add('options-container');
-
+    // Renderizado dinámico de los botones de respuesta
     questionData.options.forEach((opt, index) => {
-        const btn = document.createElement('button');
-        btn.textContent = opt;
-        btn.dataset.index = index; // Data attribute para identificar la opción
+        const btn = createNode('button', { text: opt, dataset: { index: index } });
         optionsContainer.appendChild(btn);
     });
 
-    // Un único event listener para todas las opciones
+    // Delegación de Eventos en el contenedor de respuestas
     optionsContainer.addEventListener('click', (event) => {
+        // Ignorar clicks si no fue en un botón o si ya se ha respondido
         if (event.target.tagName !== 'BUTTON' || optionsContainer.dataset.locked === 'true') return;
-        optionsContainer.dataset.locked = 'true'; // Prevenir múltiples clicks
-
+        
+        optionsContainer.dataset.locked = 'true'; // Bloquea iteraciones futuras
         const selectedIndex = parseInt(event.target.dataset.index);
         handleAnswer(selectedIndex, questionData.answer, optionsContainer, timerDisplay);
     });
@@ -180,14 +218,14 @@ function renderQuestion() {
     quizContainer.appendChild(optionsContainer);
     appContainer.appendChild(quizContainer);
 
+    // Motor lógico del tiempo restante
     appState.timer = setInterval(() => {
         timeLeft--;
         timerDisplay.textContent = `⏳ Tiempo restante: ${timeLeft}s`;
         
-        if (timeLeft <= 10) {
-            timerDisplay.classList.add('timer-warning');
-        }
+        if (timeLeft <= 10) timerDisplay.classList.add('timer-warning');
 
+        // Finalización por tiempo agotado
         if (timeLeft <= 0) {
             clearInterval(appState.timer);
             timerDisplay.textContent = "¡Tiempo agotado!";
@@ -197,66 +235,44 @@ function renderQuestion() {
     }, 1000);
 }
 
+// Validador de respuestas (Invocado por el usuario o por fin de tiempo)
 function handleAnswer(selectedIndex, correctIndex, containerNode, timerDisplay) {
+    // Parar temporizador inmediatamente para prevenir condiciones de carrera (Race Conditions)
     clearInterval(appState.timer);
 
     const buttons = containerNode.querySelectorAll('button');
     buttons.forEach(btn => btn.disabled = true);
     
+    // Feedback visual (CSS classes, evadiendo styles inline)
     buttons[correctIndex].classList.add('btn-correct');
 
     if (selectedIndex === correctIndex) {
         appState.score++;
         timerDisplay.textContent = "¡Correcto!";
-    } else {
-        if (selectedIndex !== -1) {
-            buttons[selectedIndex].classList.add('btn-incorrect');
-            timerDisplay.textContent = "¡Incorrecto!";
-        }
+    } else if (selectedIndex !== -1) {
+        buttons[selectedIndex].classList.add('btn-incorrect');
+        timerDisplay.textContent = "¡Incorrecto!";
     }
 
+    // Retraso intencionado para permitir lectura del feedback visual
     setTimeout(() => {
         appState.currentIndex++;
         renderQuestion();
     }, 2000);
 }
 
+// Vista 4: Pantalla de estadísticas finales
 function renderResults() {
     clearApp();
 
-    const resultsContainer = document.createElement('section');
-    resultsContainer.classList.add('quiz-container', 'fade-in');
-
-    const title = document.createElement('h2');
-    title.textContent = '¡Quiz Terminado!';
-
-    const scoreText = document.createElement('p');
-    scoreText.textContent = `Has acertado ${appState.score} de 3 preguntas.`;
-    scoreText.classList.add('score-text');
-
-    const feedback = document.createElement('p');
-    feedback.classList.add('feedback-text');
+    const resultsContainer = createNode('section', { classes: 'quiz-container fade-in' });
+    const title = createNode('h2', { text: '¡Quiz Terminado!' });
+    const scoreText = createNode('p', { classes: 'score-text', text: `Has acertado ${appState.score} de ${appState.questions.length} preguntas.` });
     
-    if (appState.score === 3) {
-        feedback.textContent = '¡Qué genio! Puntuación perfecta.';
-        feedback.classList.add('text-perfect');
-        createParticles('confetti-piece', 40);
-    } else if (appState.score === 2) {
-        feedback.textContent = '¡Muy bien! Tienes un nivel estupendo.';
-        feedback.classList.add('text-good');
-        createParticles('star-piece', 25);
-    } else if (appState.score === 1) {
-        feedback.textContent = 'Bueno... podría haber sido peor.';
-        feedback.classList.add('text-regular');
-        createParticles('leaf-piece', 20);
-    } else {
-        feedback.textContent = '¡Qué pena! Toca repasar un poco más.';
-        feedback.classList.add('text-bad');
-        createParticles('rain-drop', 60);
-    }
-
-    const btnRestart = document.createElement('button');
-    btnRestart.textContent = 'Volver al Menú';
+    // Delega la inyección de partículas y obtiene el texto de retroalimentación
+    const feedback = getFeedbackAndRenderParticles();
+    
+    const btnRestart = createNode('button', { text: 'Volver al Menú' });
     btnRestart.addEventListener('click', renderCategories);
 
     resultsContainer.appendChild(title);
@@ -266,30 +282,76 @@ function renderResults() {
     appContainer.appendChild(resultsContainer);
 }
 
-// 4. UNIFICACIÓN DE SISTEMAS DE PARTÍCULAS
-function createParticles(className, count) {
-    const container = document.createElement('div');
-    container.id = 'fx-container';
-    appState.fxContainer = container; // Guardar referencia en el estado global
+// Generador de comentarios en función de métricas relativas
+function getFeedbackAndRenderParticles() {
+    const feedbackNode = createNode('p', { classes: 'feedback-text' });
+    const ratio = appState.score / appState.questions.length;
 
+    // Asignación de clases CSS semánticas e inyección del tipo de partícula
+    if (ratio === 1) {
+        feedbackNode.textContent = '¡Qué genio! Puntuación perfecta.';
+        feedbackNode.classList.add('text-perfect');
+        mountParticles('confetti-piece', 40);
+    } else if (ratio >= 0.66) {
+        feedbackNode.textContent = '¡Muy bien! Tienes un nivel estupendo.';
+        feedbackNode.classList.add('text-good');
+        mountParticles('star-piece', 25);
+    } else if (ratio > 0) {
+        feedbackNode.textContent = 'Bueno... podría haber sido peor.';
+        feedbackNode.classList.add('text-regular');
+        mountParticles('leaf-piece', 20);
+    } else {
+        feedbackNode.textContent = '¡Qué pena! Toca repasar un poco más.';
+        feedbackNode.classList.add('text-bad');
+        mountParticles('rain-drop', 60);
+    }
+    
+    return feedbackNode;
+}
+
+// ==========================================
+// 4. SISTEMA DE PARTÍCULAS (Responsabilidades Separadas)
+// ==========================================
+
+/**
+ * Función Pura: Crea los nodos de animación en memoria.
+ * Retorna un DocumentFragment para evitar Reflows en el DOM principal.
+ */
+function generateParticlesFragment(className, count) {
+    const fragment = document.createDocumentFragment();
     for (let i = 0; i < count; i++) {
-        const piece = document.createElement('div');
-        piece.classList.add(className);
+        const piece = createNode('div', { classes: className });
         
-        // Agregar modificadores aleatorios compartidos
+        // Randomización inyectando clases de CSS predefinidas
         piece.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
         piece.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
         
-        // El confeti requiere lógica de color adicional
         if (className === 'confetti-piece') {
             piece.classList.add(`c-${Math.floor(Math.random() * 4) + 1}`);
         }
-        
-        container.appendChild(piece);
+        fragment.appendChild(piece);
     }
+    return fragment;
+}
+
+/**
+ * Función Impura: Recibe el fragmento de memoria, lo inserta en el DOM real
+ * y actualiza el objeto de estado global para que pueda ser rastreado.
+ */
+function mountParticles(className, count) {
+    const container = createNode('div', { id: 'fx-container' });
+    const fragment = generateParticlesFragment(className, count); 
+    
+    container.appendChild(fragment);
+    appState.fxContainer = container; 
     document.body.appendChild(container);
 }
 
+// ==========================================
+// 5. EVENTOS GLOBALES ADICIONALES
+// ==========================================
+
+// Habilita el modo oscuro alternando una clase global en el body
 function setupDarkModeToggle() {
     document.addEventListener('keydown', (event) => {
         if (event.key === 'm' || event.key === 'M') {
@@ -298,4 +360,5 @@ function setupDarkModeToggle() {
     });
 }
 
+// Arranque seguro de la aplicación
 document.addEventListener('DOMContentLoaded', init);
