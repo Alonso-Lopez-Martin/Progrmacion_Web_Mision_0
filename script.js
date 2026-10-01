@@ -1,8 +1,4 @@
-// ==========================================
-// 1. BASE DE DATOS Y ESTADO GLOBAL
-// ==========================================
-
-// Base de datos estática de preguntas organizada por categorías.
+// Base de datos con todas las preguntas separadas por categorías
 const quizData = {
     historia: [
         { q: "¿Qué tratado puso fin a la Guerra de los Treinta Años en 1648?", options: ["Paz de Westfalia", "Tratado de Versalles", "Tratado de Tordesillas", "Paz de Utrecht"], answer: 0 },
@@ -34,25 +30,19 @@ const quizData = {
     ]
 };
 
-// Objeto global de estado: Mantiene un seguimiento centralizado de la partida actual
+// Objeto para guardar el estado actual de la partida
 const appState = {
-    questions: [],      // Array de preguntas barajadas de la partida activa
-    currentIndex: 0,    // Índice de la pregunta mostrada en pantalla
-    score: 0,           // Puntuación acumulada
-    timer: null,        // Referencia del intervalo del reloj para limpiarlo de forma segura
-    fxContainer: null   // Referencia cacheada del contenedor de partículas (animaciones)
+    questions: [],      
+    currentIndex: 0,    
+    score: 0,           
+    timer: null,        
+    fxContainer: null   
 };
 
 const appContainer = document.querySelector('#app-container');
 
-// ==========================================
-// 2. FUNCIONES HELPER (Utilidades)
-// ==========================================
 
-/**
- * Función genérica para crear elementos del DOM.
- * Aplica principios DRY (Don't Repeat Yourself) reduciendo la redundancia.
- */
+// Función de ayuda para crear etiquetas HTML más rápido y no repetir código
 function createNode(tag, options = {}) {
     const el = document.createElement(tag);
     if (options.id) el.id = options.id;
@@ -68,22 +58,20 @@ function createNode(tag, options = {}) {
     return el;
 }
 
-/**
- * Purga el contenedor principal para montar la siguiente vista.
- * Destruye también los efectos visuales para evitar acumulación de nodos huérfanos.
- */
+// Limpiamos el main borrando los hijos uno a uno para evitar usar innerHTML
 function clearApp() {
-    appContainer.innerHTML = '';
+    while (appContainer.firstChild) {
+        appContainer.removeChild(appContainer.firstChild);
+    }
+    
+    // Si hay partículas en pantalla, las borramos también
     if (appState.fxContainer) {
         appState.fxContainer.remove();
         appState.fxContainer = null;
     }
 }
 
-/**
- * Algoritmo matemático Fisher-Yates para barajar arrays aleatoriamente.
- * Evita el sesgo estadístico de sort(Math.random).
- */
+// Barajamos el array usando Fisher-Yates para que sea totalmente aleatorio
 function shuffleArray(array) {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -93,17 +81,13 @@ function shuffleArray(array) {
     return newArray;
 }
 
-// Inicia el flujo lógico general al cargar la página
+// Inicializar la app
 function init() {
     renderStartScreen();
     setupDarkModeToggle();
 }
 
-// ==========================================
-// 3. GENERADORES DE VISTAS (Lógica de Navegación)
-// ==========================================
-
-// Vista 1: Pantalla inicial de bienvenida
+// Pantalla de inicio
 function renderStartScreen() {
     clearApp();
     const section = createNode('section', { id: 'start-screen', classes: 'fade-in' });
@@ -114,19 +98,18 @@ function renderStartScreen() {
     appContainer.appendChild(section);
 }
 
-// Vista 2: Selector visual de temas
+// Pantalla para elegir el tema
 function renderCategories() {
     clearApp();
     const grid = createNode('div', { classes: 'categories-grid fade-in' });
 
     const themes = [
-        { id: 'historia', title: 'Historia', img: '' },
-        { id: 'geografia', title: 'Geografía', img: '' },
-        { id: 'ciencias', title: 'Ciencias', img: '' },
-        { id: 'entretenimiento', title: 'Entretenimiento', img: '' }
+        { id: 'historia', title: 'Historia', img: 'img/icono_historia.png' },
+        { id: 'geografia', title: 'Geografía', img: 'img/icono_geografia.png' },
+        { id: 'ciencias', title: 'Ciencias', img: 'img/icono_ciencias.png' },
+        { id: 'entretenimiento', title: 'Entretenimiento', img: 'img/icono_entretenimiento.png' }
     ];
 
-    // Construcción del DOM para cada tarjeta
     themes.forEach(theme => {
         const figure = createNode('figure', { classes: 'category-card', dataset: { categoryId: theme.id } });
         const img = createNode('img', { src: theme.img, alt: `Imagen de ${theme.title}` });
@@ -137,50 +120,48 @@ function renderCategories() {
         grid.appendChild(figure);
     });
 
-    // Delegación de Eventos: Un solo listener en el contenedor padre
-    // en lugar de múltiples listeners, uno por tarjeta.
+    // Usamos delegación de eventos en el grid para no poner un listener a cada imagen
     grid.addEventListener('click', (event) => {
         const targetFigure = event.target.closest('figure.category-card');
         
-        // Prevención de errores y clicks dobles durante la animación
+        // Evitamos que hagan doble clic mientras hace la animación
         if (!targetFigure || targetFigure.classList.contains('spin-shrink')) return;
 
-        targetFigure.classList.add('spin-shrink'); // Inicia animación de salida
+        targetFigure.classList.add('spin-shrink'); 
         const categoryId = targetFigure.dataset.categoryId;
         
-        // Espera a que termine la transición CSS (600ms) antes de cargar la pregunta
+        // Esperamos a que termine de girar para cargar el quiz
         setTimeout(() => startQuiz(categoryId), 600);
     });
 
     appContainer.appendChild(grid);
 }
 
-// Lógica intermedia: Configuración de la partida con programación defensiva
+// Preparamos los datos antes de mostrar la primera pregunta
 function startQuiz(categoryId) {
     const categoryData = quizData[categoryId];
     
-    // Control de fallos: Si los datos de la categoría están dañados, retrocede al menú
+    // Por si acaso hay un fallo en los datos, evitamos que la app se rompa
     if (!categoryData || !Array.isArray(categoryData) || categoryData.length === 0) {
         console.error(`Error: Datos no encontrados para ${categoryId}`);
         renderCategories(); 
         return;
     }
 
-    // Calcula el número de preguntas garantizando que nunca se pidan más de las que hay
+    // Cogemos 3 preguntas o menos si la categoría no tiene suficientes
     const questionsToPlay = Math.min(3, categoryData.length);
     
-    // Inicializa el estado para la nueva partida
     appState.questions = shuffleArray(categoryData).slice(0, questionsToPlay);
     appState.currentIndex = 0;
     appState.score = 0;
     renderQuestion();
 }
 
-// Vista 3: Interfaz principal del cuestionario
+// Mostramos la pregunta actual
 function renderQuestion() {
     clearApp();
     
-    // Condición de finalización de partida
+    // Si ya no quedan preguntas, pasamos a los resultados
     if (appState.currentIndex >= appState.questions.length) {
         renderResults();
         return;
@@ -190,24 +171,25 @@ function renderQuestion() {
     const quizContainer = createNode('section', { classes: 'quiz-container fade-in' });
     const title = createNode('h2', { text: `Pregunta ${appState.currentIndex + 1} de ${appState.questions.length}` });
     
-    // Estructura del temporizador
     let timeLeft = 60;
     const timerDisplay = createNode('p', { classes: 'timer-text', text: `⏳ Tiempo restante: ${timeLeft}s` });
     const questionText = createNode('p', { classes: 'question-text', text: questionData.q });
     const optionsContainer = createNode('div', { classes: 'options-container' });
 
-    // Renderizado dinámico de los botones de respuesta
+    // Creamos los botones con las respuestas
     questionData.options.forEach((opt, index) => {
         const btn = createNode('button', { text: opt, dataset: { index: index } });
         optionsContainer.appendChild(btn);
     });
 
-    // Delegación de Eventos en el contenedor de respuestas
+    // Usamos una variable para bloquear el clic y que no respondan dos veces
+    let isAnswerLocked = false; 
+
+    // Delegación de eventos para los botones de respuesta
     optionsContainer.addEventListener('click', (event) => {
-        // Ignorar clicks si no fue en un botón o si ya se ha respondido
-        if (event.target.tagName !== 'BUTTON' || optionsContainer.dataset.locked === 'true') return;
+        if (event.target.tagName !== 'BUTTON' || isAnswerLocked) return;
         
-        optionsContainer.dataset.locked = 'true'; // Bloquea iteraciones futuras
+        isAnswerLocked = true;
         const selectedIndex = parseInt(event.target.dataset.index);
         handleAnswer(selectedIndex, questionData.answer, optionsContainer, timerDisplay);
     });
@@ -218,50 +200,51 @@ function renderQuestion() {
     quizContainer.appendChild(optionsContainer);
     appContainer.appendChild(quizContainer);
 
-    // Motor lógico del tiempo restante
+    // Arrancamos el cronómetro
     appState.timer = setInterval(() => {
         timeLeft--;
         timerDisplay.textContent = `⏳ Tiempo restante: ${timeLeft}s`;
         
+        // Efecto visual cuando quedan 10 segundos
         if (timeLeft <= 10) timerDisplay.classList.add('timer-warning');
 
-        // Finalización por tiempo agotado
         if (timeLeft <= 0) {
             clearInterval(appState.timer);
             timerDisplay.textContent = "¡Tiempo agotado!";
-            optionsContainer.dataset.locked = 'true';
+            isAnswerLocked = true; // Bloqueamos opciones si se acaba el tiempo
             handleAnswer(-1, questionData.answer, optionsContainer, timerDisplay);
         }
     }, 1000);
 }
 
-// Validador de respuestas (Invocado por el usuario o por fin de tiempo)
+// Comprueba la respuesta y pone los colores
 function handleAnswer(selectedIndex, correctIndex, containerNode, timerDisplay) {
-    // Parar temporizador inmediatamente para prevenir condiciones de carrera (Race Conditions)
+    // Paramos el tiempo lo primero
     clearInterval(appState.timer);
 
     const buttons = containerNode.querySelectorAll('button');
     buttons.forEach(btn => btn.disabled = true);
     
-    // Feedback visual (CSS classes, evadiendo styles inline)
+    // Pintamos la correcta en verde
     buttons[correctIndex].classList.add('btn-correct');
 
     if (selectedIndex === correctIndex) {
         appState.score++;
         timerDisplay.textContent = "¡Correcto!";
     } else if (selectedIndex !== -1) {
+        // Si ha fallado y llegó a pulsar una, la ponemos en rojo
         buttons[selectedIndex].classList.add('btn-incorrect');
         timerDisplay.textContent = "¡Incorrecto!";
     }
 
-    // Retraso intencionado para permitir lectura del feedback visual
+    // Esperamos 2 segundos para ver los colores antes de cambiar de pantalla
     setTimeout(() => {
         appState.currentIndex++;
         renderQuestion();
     }, 2000);
 }
 
-// Vista 4: Pantalla de estadísticas finales
+// Pantalla final con los resultados
 function renderResults() {
     clearApp();
 
@@ -269,7 +252,6 @@ function renderResults() {
     const title = createNode('h2', { text: '¡Quiz Terminado!' });
     const scoreText = createNode('p', { classes: 'score-text', text: `Has acertado ${appState.score} de ${appState.questions.length} preguntas.` });
     
-    // Delega la inyección de partículas y obtiene el texto de retroalimentación
     const feedback = getFeedbackAndRenderParticles();
     
     const btnRestart = createNode('button', { text: 'Volver al Menú' });
@@ -282,12 +264,11 @@ function renderResults() {
     appContainer.appendChild(resultsContainer);
 }
 
-// Generador de comentarios en función de métricas relativas
+// Muestra el texto final según la nota y llama a las partículas
 function getFeedbackAndRenderParticles() {
     const feedbackNode = createNode('p', { classes: 'feedback-text' });
     const ratio = appState.score / appState.questions.length;
 
-    // Asignación de clases CSS semánticas e inyección del tipo de partícula
     if (ratio === 1) {
         feedbackNode.textContent = '¡Qué genio! Puntuación perfecta.';
         feedbackNode.classList.add('text-perfect');
@@ -309,20 +290,13 @@ function getFeedbackAndRenderParticles() {
     return feedbackNode;
 }
 
-// ==========================================
-// 4. SISTEMA DE PARTÍCULAS (Responsabilidades Separadas)
-// ==========================================
 
-/**
- * Función Pura: Crea los nodos de animación en memoria.
- * Retorna un DocumentFragment para evitar Reflows en el DOM principal.
- */
+// Generamos los divs de los efectos en memoria antes de pasarlos al HTML
 function generateParticlesFragment(className, count) {
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < count; i++) {
         const piece = createNode('div', { classes: className });
         
-        // Randomización inyectando clases de CSS predefinidas
         piece.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
         piece.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
         
@@ -334,10 +308,7 @@ function generateParticlesFragment(className, count) {
     return fragment;
 }
 
-/**
- * Función Impura: Recibe el fragmento de memoria, lo inserta en el DOM real
- * y actualiza el objeto de estado global para que pueda ser rastreado.
- */
+// Pintamos las partículas en el HTML y nos lo guardamos en appState
 function mountParticles(className, count) {
     const container = createNode('div', { id: 'fx-container' });
     const fragment = generateParticlesFragment(className, count); 
@@ -347,11 +318,7 @@ function mountParticles(className, count) {
     document.body.appendChild(container);
 }
 
-// ==========================================
-// 5. EVENTOS GLOBALES ADICIONALES
-// ==========================================
-
-// Habilita el modo oscuro alternando una clase global en el body
+// Evento para activar y desactivar el modo oscuro con la letra M
 function setupDarkModeToggle() {
     document.addEventListener('keydown', (event) => {
         if (event.key === 'm' || event.key === 'M') {
@@ -360,5 +327,5 @@ function setupDarkModeToggle() {
     });
 }
 
-// Arranque seguro de la aplicación
+// Cargar todo cuando el HTML esté listo
 document.addEventListener('DOMContentLoaded', init);
