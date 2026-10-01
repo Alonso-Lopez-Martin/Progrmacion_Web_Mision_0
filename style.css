@@ -7,6 +7,12 @@
     --card-bg: #ffffff;
     --border-color: #dddddd;
     --transition-speed: 0.3s;
+
+    /* Colores para el feedback visual */
+    --correct-bg: #4CAF50;
+    --correct-text: #ffffff;
+    --incorrect-bg: #f44336;
+    --incorrect-text: #ffffff;
 }
 
 body.dark-mode {
@@ -16,9 +22,13 @@ body.dark-mode {
     --primary-hover: #74c7ec;
     --card-bg: #313244;
     --border-color: #45475a;
+
+    --correct-bg: #a6e3a1; 
+    --correct-text: #1e1e2e;
+    --incorrect-bg: #f38ba8; 
+    --incorrect-text: #1e1e2e;
 }
 
-/* Reset básico */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -33,6 +43,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    overflow-x: hidden; 
 }
 
 header {
@@ -40,6 +51,8 @@ header {
     padding: 2rem;
     background-color: var(--card-bg);
     border-bottom: 2px solid var(--border-color);
+    position: relative;
+    z-index: 10;
 }
 
 .logo-placeholder {
@@ -59,6 +72,7 @@ main {
     align-items: center;
     padding: 2rem;
     text-align: center;
+    position: relative;
 }
 
 footer {
@@ -67,9 +81,11 @@ footer {
     background-color: var(--card-bg);
     border-top: 1px solid var(--border-color);
     font-size: 0.9rem;
+    position: relative;
+    z-index: 10;
 }
 
-/* Botones generales */
+/* Botones */
 button {
     background-color: var(--primary-color);
     color: #fff;
@@ -78,13 +94,45 @@ button {
     font-size: 1.2rem;
     border-radius: 8px;
     cursor: pointer;
-    transition: transform var(--transition-speed), background-color var(--transition-speed);
+    transition: transform 0.15s ease, background-color var(--transition-speed);
     margin: 0.5rem;
 }
 
-button:hover {
+button:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+button:hover:not(:disabled) {
     background-color: var(--primary-hover);
-    transform: scale(1.05); /* Efecto hover solicitado */
+    transform: scale(1.05);
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-correct {
+    background-color: var(--correct-bg) !important;
+    color: var(--correct-text) !important;
+    border-color: var(--correct-bg) !important;
+    transform: scale(1.05);
+    box-shadow: 0 0 15px var(--correct-bg);
+}
+
+.btn-incorrect {
+    background-color: var(--incorrect-bg) !important;
+    color: var(--incorrect-text) !important;
+    border-color: var(--incorrect-bg) !important;
+    animation: shake 0.4s ease; 
+}
+
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
+    100% { transform: translateX(0); }
 }
 
 /* Layout de Categorías */
@@ -110,12 +158,23 @@ figure.category-card:hover {
     box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
+/* NUEVA ANIMACIÓN: Giro y encogimiento al pulsar categoría */
+.spin-shrink {
+    animation: spinShrink 0.6s ease-in forwards !important;
+    pointer-events: none; /* Evita doble clic */
+}
+
+@keyframes spinShrink {
+    0% { transform: scale(1) rotate(0deg); opacity: 1; }
+    100% { transform: scale(0) rotate(360deg); opacity: 0; }
+}
+
 figure.category-card img {
     width: 100%;
     height: 150px;
     object-fit: cover;
     border-radius: 8px;
-    background-color: var(--border-color); /* Fondo temporal hasta que pongas tu img */
+    background-color: var(--border-color);
 }
 
 figure.category-card figcaption {
@@ -132,10 +191,26 @@ figure.category-card figcaption {
     max-width: 600px;
     width: 100%;
     border: 1px solid var(--border-color);
+    position: relative;
+    z-index: 10;
 }
 
-.quiz-container h2 {
-    margin-bottom: 2rem;
+.timer-text {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.timer-warning {
+    color: var(--incorrect-bg);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
 }
 
 .options-container {
@@ -151,7 +226,146 @@ figure.category-card figcaption {
     border: 2px solid var(--primary-color);
 }
 
-.options-container button:hover {
-    background-color: var(--primary-color);
-    color: #fff;
+.question-text {
+    margin-bottom: 1.5rem;
+    font-size: 1.2rem;
+}
+
+.score-text {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.feedback-text {
+    font-weight: bold;
+    margin-bottom: 2rem;
+    font-size: 1.5rem;
+}
+
+.fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================
+   SISTEMA DE PARTÍCULAS (Originalidad 10/10)
+========================================== */
+#fx-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* 0 ACIERTOS: LLUVIA */
+.rain-drop {
+    position: absolute;
+    top: -20px;
+    width: 2px;
+    height: 25px;
+    background-color: #64b5f6;
+    animation: fallRain linear infinite;
+}
+body.dark-mode .rain-drop { background-color: #89b4fa; opacity: 0.6; }
+
+@keyframes fallRain {
+    to { transform: translateY(110vh); }
+}
+
+/* 1 ACIERTO: HOJAS DE OTOÑO */
+.leaf-piece {
+    position: absolute;
+    top: -20px;
+    width: 20px;
+    height: 20px;
+    background-color: #e67e22;
+    border-radius: 15px 0 15px 0; /* Forma de hoja */
+    animation: swayLeaf ease-in-out infinite;
+}
+body.dark-mode .leaf-piece { background-color: #fab387; opacity: 0.8; }
+
+@keyframes swayLeaf {
+    0% { transform: translateY(0) translateX(0) rotate(0deg); }
+    33% { transform: translateY(40vh) translateX(50px) rotate(90deg); }
+    66% { transform: translateY(80vh) translateX(-50px) rotate(180deg); }
+    100% { transform: translateY(120vh) translateX(0) rotate(270deg); }
+}
+
+/* 2 ACIERTOS: ESTRELLAS FLOTANTES */
+.star-piece {
+    position: absolute;
+    bottom: -20px; /* Surgen desde abajo */
+    width: 20px;
+    height: 20px;
+    background-color: #FFD700;
+    /* Crear forma de estrella de 5 puntas usando clip-path */
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    animation: floatStar linear infinite;
+}
+body.dark-mode .star-piece { background-color: #f9e2af; }
+
+@keyframes floatStar {
+    0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; transform: translateY(-10vh) scale(1) rotate(45deg); }
+    90% { opacity: 1; }
+    100% { transform: translateY(-110vh) scale(1.5) rotate(360deg); opacity: 0; }
+}
+
+/* 3 ACIERTOS: CONFETI (Ahora es infinito) */
+.confetti-piece {
+    position: absolute;
+    top: -20px;
+    width: 12px;
+    height: 12px;
+    animation: fallConfetti linear infinite; /* Modificado de forwards a infinite */
+}
+
+@keyframes fallConfetti {
+    to { transform: translateY(110vh) rotate(720deg); }
+}
+
+/* Colores de confeti */
+.c-1 { background-color: #f44336; }
+.c-2 { background-color: #4CAF50; }
+.c-3 { background-color: #2196F3; }
+.c-4 { background-color: #FFEB3B; }
+
+/* Posiciones horizontales */
+.p-1 { left: 5%; } .p-2 { left: 15%; } .p-3 { left: 25%; } .p-4 { left: 35%; } .p-5 { left: 45%; }
+.p-6 { left: 55%; } .p-7 { left: 65%; } .p-8 { left: 75%; } .p-9 { left: 85%; } .p-10 { left: 95%; }
+
+/* Velocidades y retrasos ampliadas para más naturalidad */
+.d-1 { animation-duration: 2s; animation-delay: 0s; }
+.d-2 { animation-duration: 3s; animation-delay: 0.5s; }
+.d-3 { animation-duration: 4s; animation-delay: 1s; }
+.d-4 { animation-duration: 5s; animation-delay: 1.5s; }
+
+/* Colores dinámicos para el texto final según la puntuación */
+.text-perfect {
+    color: var(--correct-bg);
+}
+
+.text-good {
+    color: #d4af37; /* Dorado */
+}
+body.dark-mode .text-good {
+    color: #f9e2af; /* Dorado suave para modo oscuro */
+}
+
+.text-regular {
+    color: #e67e22; /* Naranja */
+}
+body.dark-mode .text-regular {
+    color: #fab387; /* Naranja suave para modo oscuro */
+}
+
+.text-bad {
+    color: var(--incorrect-bg);
 }

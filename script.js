@@ -30,26 +30,40 @@ const quizData = {
     ]
 };
 
-// Variables de estado global
+// Variables globales
 let currentQuestions = [];
 let currentQuestionIndex = 0;
 let score = 0;
+let timerInterval;
 
-// Referencias del DOM
 const appContainer = document.querySelector('#app-container');
 
-// Inicializador de la aplicación
+function clearApp() {
+    appContainer.innerHTML = '';
+    const fx = document.getElementById('fx-container');
+    if (fx) fx.remove();
+}
+
+function shuffleArray(array) {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+}
+
 function init() {
     renderStartScreen();
     setupDarkModeToggle();
 }
 
-// Pantalla de inicio
+// PANTALLA 1: Inicio
 function renderStartScreen() {
-    appContainer.innerHTML = ''; 
-
+    clearApp();
     const section = document.createElement('section');
     section.id = 'start-screen';
+    section.classList.add('fade-in');
 
     const btnStart = document.createElement('button');
     btnStart.textContent = 'Empezar Juego';
@@ -59,12 +73,11 @@ function renderStartScreen() {
     appContainer.appendChild(section);
 }
 
-// Pantalla de selección de categoría
+// PANTALLA 2: Categorías
 function renderCategories() {
-    appContainer.innerHTML = '';
-    
+    clearApp();
     const grid = document.createElement('div');
-    grid.classList.add('categories-grid');
+    grid.classList.add('categories-grid', 'fade-in');
 
     const themes = [
         { id: 'historia', title: 'Historia', img: 'img/icono_historia.png' },
@@ -86,27 +99,35 @@ function renderCategories() {
 
         figure.appendChild(img);
         figure.appendChild(figcaption);
-
-        figure.addEventListener('click', () => startQuiz(theme.id));
+        
+        // EVENTO con animación de giro
+        figure.addEventListener('click', (event) => {
+            // Añadir clase de giro y encogimiento al elemento pulsado
+            const targetFigure = event.currentTarget;
+            targetFigure.classList.add('spin-shrink');
+            
+            // Retrasar el inicio del quiz para que dé tiempo a ver la animación
+            setTimeout(() => {
+                startQuiz(theme.id);
+            }, 600); // 600ms coinciden con el tiempo de animación en CSS
+        });
+        
         grid.appendChild(figure);
     });
 
     appContainer.appendChild(grid);
 }
 
-// Preparar y empezar el quiz
 function startQuiz(categoryId) {
-    const allQuestions = [...quizData[categoryId]];
-    currentQuestions = allQuestions.sort(() => 0.5 - Math.random()).slice(0, 3);
+    currentQuestions = shuffleArray(quizData[categoryId]).slice(0, 3);
     currentQuestionIndex = 0;
     score = 0;
     renderQuestion();
 }
 
-// Mostrar pregunta actual
+// PANTALLA 3: Pregunta
 function renderQuestion() {
-    appContainer.innerHTML = '';
-    
+    clearApp();
     if (currentQuestionIndex >= currentQuestions.length) {
         renderResults();
         return;
@@ -114,64 +135,112 @@ function renderQuestion() {
 
     const questionData = currentQuestions[currentQuestionIndex];
     const quizContainer = document.createElement('section');
-    quizContainer.classList.add('quiz-container');
+    quizContainer.classList.add('quiz-container', 'fade-in');
 
     const title = document.createElement('h2');
     title.textContent = `Pregunta ${currentQuestionIndex + 1} de 3`;
-    
+
+    const timerDisplay = document.createElement('p');
+    timerDisplay.classList.add('timer-text');
+    let timeLeft = 60;
+    timerDisplay.textContent = `⏳ Tiempo restante: ${timeLeft}s`;
+
     const questionText = document.createElement('p');
     questionText.textContent = questionData.q;
-    questionText.style.marginBottom = '1.5rem';
-    questionText.style.fontSize = '1.2rem';
+    questionText.classList.add('question-text');
 
     const optionsContainer = document.createElement('div');
     optionsContainer.classList.add('options-container');
 
+    const optionButtons = [];
+
     questionData.options.forEach((opt, index) => {
         const btn = document.createElement('button');
         btn.textContent = opt;
-        btn.addEventListener('click', () => handleAnswer(index, questionData.answer));
+        btn.addEventListener('click', () => handleAnswer(index, questionData.answer, optionButtons, timerDisplay));
         optionsContainer.appendChild(btn);
+        optionButtons.push(btn);
     });
 
     quizContainer.appendChild(title);
+    quizContainer.appendChild(timerDisplay);
     quizContainer.appendChild(questionText);
     quizContainer.appendChild(optionsContainer);
     appContainer.appendChild(quizContainer);
+
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        timerDisplay.textContent = `⏳ Tiempo restante: ${timeLeft}s`;
+        
+        if (timeLeft <= 10) {
+            timerDisplay.classList.add('timer-warning');
+        }
+
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            timerDisplay.textContent = "¡Tiempo agotado!";
+            handleAnswer(-1, questionData.answer, optionButtons, timerDisplay);
+        }
+    }, 1000);
 }
 
-// Evaluar respuesta
-function handleAnswer(selectedIndex, correctIndex) {
+function handleAnswer(selectedIndex, correctIndex, buttons, timerDisplay) {
+    clearInterval(timerInterval);
+
+    buttons.forEach(btn => btn.disabled = true);
+    buttons[correctIndex].classList.add('btn-correct');
+
     if (selectedIndex === correctIndex) {
         score++;
+        timerDisplay.textContent = "¡Correcto!";
+    } else {
+        if (selectedIndex !== -1) {
+            buttons[selectedIndex].classList.add('btn-incorrect');
+            timerDisplay.textContent = "¡Incorrecto!";
+        }
     }
-    currentQuestionIndex++;
-    renderQuestion();
+
+    setTimeout(() => {
+        currentQuestionIndex++;
+        renderQuestion();
+    }, 2000);
 }
 
-// Pantalla final
+// PANTALLA 4: Resultados y 4 Tipos de Animaciones
 function renderResults() {
-    appContainer.innerHTML = '';
+    clearApp();
 
     const resultsContainer = document.createElement('section');
-    resultsContainer.classList.add('quiz-container');
+    resultsContainer.classList.add('quiz-container', 'fade-in');
 
     const title = document.createElement('h2');
     title.textContent = '¡Quiz Terminado!';
 
     const scoreText = document.createElement('p');
     scoreText.textContent = `Has acertado ${score} de 3 preguntas.`;
-    scoreText.style.fontSize = '1.2rem';
-    scoreText.style.marginBottom = '1rem';
+    scoreText.classList.add('score-text');
 
     const feedback = document.createElement('p');
-    feedback.style.fontWeight = 'bold';
-    feedback.style.marginBottom = '2rem';
+    feedback.classList.add('feedback-text');
     
-    if (score === 3) feedback.textContent = '¡Qué genio! Puntuación perfecta.';
-    else if (score === 2) feedback.textContent = '¡Muy bien! Tienes buen nivel.';
-    else if (score === 1) feedback.textContent = 'Bueno... podría haber sido peor.';
-    else feedback.textContent = '¡Qué pena! Toca repasar un poco más.';
+    // Asignación de animaciones y clases de color según nota
+    if (score === 3) {
+        feedback.textContent = '¡Qué genio! Puntuación perfecta.';
+        feedback.classList.add('text-perfect'); // En lugar de style.color
+        createConfetti();
+    } else if (score === 2) {
+        feedback.textContent = '¡Muy bien! Tienes un nivel estupendo.';
+        feedback.classList.add('text-good'); // En lugar de style.color
+        createStars();
+    } else if (score === 1) {
+        feedback.textContent = 'Bueno... podría haber sido peor.';
+        feedback.classList.add('text-regular'); // En lugar de style.color
+        createLeaves();
+    } else {
+        feedback.textContent = '¡Qué pena! Toca repasar un poco más.';
+        feedback.classList.add('text-bad'); // En lugar de style.color
+        createRain();
+    }
 
     const btnRestart = document.createElement('button');
     btnRestart.textContent = 'Volver al Menú';
@@ -184,7 +253,63 @@ function renderResults() {
     appContainer.appendChild(resultsContainer);
 }
 
-// Configuración del Modo Oscuro
+// ----------------------------------------------------
+// CREADORES DE PARTÍCULAS DOM (4 Niveles)
+// ----------------------------------------------------
+function createConfetti() {
+    const container = document.createElement('div');
+    container.id = 'fx-container';
+    for (let i = 0; i < 40; i++) {
+        const piece = document.createElement('div');
+        piece.classList.add('confetti-piece');
+        piece.classList.add(`c-${Math.floor(Math.random() * 4) + 1}`);
+        piece.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
+        piece.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
+        container.appendChild(piece);
+    }
+    document.body.appendChild(container);
+}
+
+function createStars() {
+    const container = document.createElement('div');
+    container.id = 'fx-container';
+    for (let i = 0; i < 25; i++) {
+        const star = document.createElement('div');
+        star.classList.add('star-piece');
+        star.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
+        star.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
+        container.appendChild(star);
+    }
+    document.body.appendChild(container);
+}
+
+function createLeaves() {
+    const container = document.createElement('div');
+    container.id = 'fx-container';
+    for (let i = 0; i < 20; i++) {
+        const leaf = document.createElement('div');
+        leaf.classList.add('leaf-piece');
+        leaf.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
+        leaf.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
+        container.appendChild(leaf);
+    }
+    document.body.appendChild(container);
+}
+
+function createRain() {
+    const container = document.createElement('div');
+    container.id = 'fx-container';
+    for (let i = 0; i < 60; i++) {
+        const drop = document.createElement('div');
+        drop.classList.add('rain-drop');
+        drop.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
+        drop.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
+        container.appendChild(drop);
+    }
+    document.body.appendChild(container);
+}
+
+// Modo Oscuro
 function setupDarkModeToggle() {
     document.addEventListener('keydown', (event) => {
         if (event.key === 'm' || event.key === 'M') {
@@ -193,5 +318,4 @@ function setupDarkModeToggle() {
     });
 }
 
-// Iniciar app al cargar el DOM
 document.addEventListener('DOMContentLoaded', init);
