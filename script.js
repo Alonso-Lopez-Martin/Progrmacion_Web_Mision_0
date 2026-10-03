@@ -48,7 +48,10 @@ function createNode(tag, options = {}) {
     // Le asignamos los atributos si nos los pasan
     if (options.id) el.id = options.id;
     if (options.classes) el.className = options.classes; 
-    if (options.text) el.textContent = options.text;
+    
+    // Comprobamos que no sea undefined para que acepte un 0 o un string vacío sin fallar
+    if (options.text !== undefined) el.textContent = options.text;
+    
     if (options.src) el.src = options.src;
     if (options.alt) el.alt = options.alt;
     
@@ -181,8 +184,17 @@ function renderQuestion() {
     const questionText = createNode('p', { classes: 'question-text', text: questionData.q });
     const optionsContainer = createNode('div', { classes: 'options-container' });
 
-    // Creamos los botones con las respuestas
-    questionData.options.forEach((opt, index) => {
+    // Guardamos el texto correcto antes de barajar para saber cuál era la buena
+    const correctText = questionData.options[questionData.answer];
+    
+    // Barajamos las opciones para que no salgan siempre en el mismo sitio
+    const shuffledOptions = shuffleArray(questionData.options);
+    
+    // Buscamos dónde ha caído la respuesta correcta después de barajar
+    const newCorrectIndex = shuffledOptions.indexOf(correctText);
+
+    // Creamos los botones con las respuestas ya mezcladas
+    shuffledOptions.forEach((opt, index) => {
         const btn = createNode('button', { text: opt, dataset: { index: index } });
         optionsContainer.appendChild(btn);
     });
@@ -192,12 +204,19 @@ function renderQuestion() {
 
     // Delegación de eventos para los botones de respuesta
     optionsContainer.addEventListener('click', (event) => {
-        // Lógica de la entrega del 64: comprobamos que sea un botón
-        if (event.target.tagName !== 'BUTTON' || isAnswerLocked) return;
+        // Usamos closest('button') para asegurarnos de pillar el clic aunque pongan un icono dentro
+        const clickedBtn = event.target.closest('button');
+        
+        // Si no es un botón o ya se ha respondido antes, paramos
+        if (!clickedBtn || isAnswerLocked) return;
         
         isAnswerLocked = true;
-        const selectedIndex = parseInt(event.target.dataset.index);
-        handleAnswer(selectedIndex, questionData.answer, optionsContainer, timerDisplay);
+        
+        // Convertimos el texto del dataset a número para validar la respuesta
+        const selectedIndex = Number(clickedBtn.dataset.index);
+        
+        // Le pasamos el newCorrectIndex para que valide bien
+        handleAnswer(selectedIndex, newCorrectIndex, optionsContainer, timerDisplay);
     });
 
     quizContainer.appendChild(title);
@@ -205,6 +224,9 @@ function renderQuestion() {
     quizContainer.appendChild(questionText);
     quizContainer.appendChild(optionsContainer);
     appContainer.appendChild(quizContainer);
+
+    // Limpiamos el intervalo por si hubiera quedado alguno colgado antes de crear uno nuevo
+    clearInterval(appState.timer);
 
     // Arrancamos el cronómetro
     appState.timer = setInterval(() => {
@@ -220,7 +242,7 @@ function renderQuestion() {
             isAnswerLocked = true; // Bloqueamos opciones
             
             // Mandamos -1 porque no ha pulsado nada
-            handleAnswer(-1, questionData.answer, optionsContainer, timerDisplay);
+            handleAnswer(-1, newCorrectIndex, optionsContainer, timerDisplay);
         }
     }, 1000);
 }
@@ -233,15 +255,21 @@ function handleAnswer(selectedIndex, correctIndex, containerNode, timerDisplay) 
     const buttons = containerNode.querySelectorAll('button');
     buttons.forEach(btn => btn.disabled = true);
     
-    // Pintamos la correcta en verde
-    buttons[correctIndex].classList.add('btn-correct');
+    // Buscamos el botón correcto por su atributo dataset en vez de por el orden en el HTML
+    const correctBtn = containerNode.querySelector(`button[data-index="${correctIndex}"]`);
+    if (correctBtn) {
+        correctBtn.classList.add('btn-correct');
+    }
 
     if (selectedIndex === correctIndex) {
         appState.score++;
         timerDisplay.textContent = "¡Correcto!";
     } else if (selectedIndex !== -1) {
-        // Si ha fallado y llegó a pulsar una, la ponemos en rojo
-        buttons[selectedIndex].classList.add('btn-incorrect');
+        // Buscamos el botón seleccionado también por dataset
+        const selectedBtn = containerNode.querySelector(`button[data-index="${selectedIndex}"]`);
+        if (selectedBtn) {
+            selectedBtn.classList.add('btn-incorrect');
+        }
         timerDisplay.textContent = "¡Incorrecto!";
     }
 
