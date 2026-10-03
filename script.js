@@ -1,4 +1,4 @@
-// Base de datos con todas las preguntas separadas por categorías
+// Base de datos de preguntas
 const quizData = {
     historia: [
         { q: "¿Qué tratado puso fin a la Guerra de los Treinta Años en 1648?", options: ["Paz de Westfalia", "Tratado de Versalles", "Tratado de Tordesillas", "Paz de Utrecht"], answer: 0 },
@@ -30,7 +30,7 @@ const quizData = {
     ]
 };
 
-// Objeto para guardar el estado actual de la partida
+// Objeto de estado para controlar la partida
 const appState = {
     questions: [],      
     currentIndex: 0,    
@@ -41,15 +41,18 @@ const appState = {
 
 const appContainer = document.querySelector('#app-container');
 
-
-// Función de ayuda para crear etiquetas HTML más rápido y no repetir código
+// Helper para crear elementos HTML más rápido
 function createNode(tag, options = {}) {
     const el = document.createElement(tag);
+    
+    // Le asignamos los atributos si nos los pasan en el objeto options
     if (options.id) el.id = options.id;
     if (options.classes) el.className = options.classes; 
     if (options.text) el.textContent = options.text;
     if (options.src) el.src = options.src;
     if (options.alt) el.alt = options.alt;
+    
+    // Si nos pasan un dataset, lo recorremos y lo añadimos
     if (options.dataset) {
         Object.entries(options.dataset).forEach(([key, value]) => {
             el.dataset[key] = value;
@@ -58,22 +61,25 @@ function createNode(tag, options = {}) {
     return el;
 }
 
-// Limpiamos el main borrando los hijos uno a uno para evitar usar innerHTML
+// Vacía el DOM de forma limpia borrando los nodos uno a uno
 function clearApp() {
+    // Mientras haya un primer hijo, lo borramos (mejor práctica que innerHTML)
     while (appContainer.firstChild) {
         appContainer.removeChild(appContainer.firstChild);
     }
     
-    // Si hay partículas en pantalla, las borramos también
+    // Si la pantalla anterior dejó partículas dibujadas, las limpiamos para liberar memoria
     if (appState.fxContainer) {
         appState.fxContainer.remove();
         appState.fxContainer = null;
     }
 }
 
-// Barajamos el array usando Fisher-Yates para que sea totalmente aleatorio
+// Barajar array (algoritmo Fisher-Yates)
 function shuffleArray(array) {
     const newArray = [...array];
+    
+    // Recorremos el array de atrás hacia adelante intercambiando elementos al azar
     for (let i = newArray.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
@@ -81,13 +87,13 @@ function shuffleArray(array) {
     return newArray;
 }
 
-// Inicializar la app
+// Arranque de la app
 function init() {
     renderStartScreen();
     setupDarkModeToggle();
 }
 
-// Pantalla de inicio
+// Pantalla principal
 function renderStartScreen() {
     clearApp();
     const section = createNode('section', { id: 'start-screen', classes: 'fade-in' });
@@ -98,7 +104,7 @@ function renderStartScreen() {
     appContainer.appendChild(section);
 }
 
-// Pantalla para elegir el tema
+// Menú de selección de categorías
 function renderCategories() {
     clearApp();
     const grid = createNode('div', { classes: 'categories-grid fade-in' });
@@ -110,6 +116,7 @@ function renderCategories() {
         { id: 'entretenimiento', title: 'Entretenimiento', img: 'img/icono_entretenimiento.png' }
     ];
 
+    // Construimos una tarjeta visual para cada tema y la metemos al grid
     themes.forEach(theme => {
         const figure = createNode('figure', { classes: 'category-card', dataset: { categoryId: theme.id } });
         const img = createNode('img', { src: theme.img, alt: `Imagen de ${theme.title}` });
@@ -120,48 +127,51 @@ function renderCategories() {
         grid.appendChild(figure);
     });
 
-    // Usamos delegación de eventos en el grid para no poner un listener a cada imagen
+    // Delegación de eventos: ponemos un solo listener al grid en lugar de uno a cada tarjeta
     grid.addEventListener('click', (event) => {
+        // Buscamos si han pinchado dentro de una tarjeta
         const targetFigure = event.target.closest('figure.category-card');
         
-        // Evitamos que hagan doble clic mientras hace la animación
+        // Si pinchan fuera, o la tarjeta ya se está animando, no hacemos nada
         if (!targetFigure || targetFigure.classList.contains('spin-shrink')) return;
 
+        // Le ponemos la clase CSS para que haga la animación de girar
         targetFigure.classList.add('spin-shrink'); 
         const categoryId = targetFigure.dataset.categoryId;
         
-        // Esperamos a que termine de girar para cargar el quiz
+        // Esperamos 600 milisegundos a que termine la animación antes de cambiar de pantalla
         setTimeout(() => startQuiz(categoryId), 600);
     });
 
     appContainer.appendChild(grid);
 }
 
-// Preparamos los datos antes de mostrar la primera pregunta
+// Configurar los datos de la partida elegida
 function startQuiz(categoryId) {
     const categoryData = quizData[categoryId];
     
-    // Por si acaso hay un fallo en los datos, evitamos que la app se rompa
+    // Comprobación defensiva: evitamos que el código pete si la categoría falla o no tiene datos
     if (!categoryData || !Array.isArray(categoryData) || categoryData.length === 0) {
         console.error(`Error: Datos no encontrados para ${categoryId}`);
         renderCategories(); 
         return;
     }
 
-    // Cogemos 3 preguntas o menos si la categoría no tiene suficientes
+    // Aseguramos pedir como máximo 3 preguntas, por si la categoría tuviese menos
     const questionsToPlay = Math.min(3, categoryData.length);
     
+    // Barajamos, recortamos y reiniciamos los puntos
     appState.questions = shuffleArray(categoryData).slice(0, questionsToPlay);
     appState.currentIndex = 0;
     appState.score = 0;
     renderQuestion();
 }
 
-// Mostramos la pregunta actual
+// Dibujar la pregunta y opciones
 function renderQuestion() {
     clearApp();
     
-    // Si ya no quedan preguntas, pasamos a los resultados
+    // Si el índice supera el total de preguntas, cortamos y mostramos la nota
     if (appState.currentIndex >= appState.questions.length) {
         renderResults();
         return;
@@ -176,21 +186,25 @@ function renderQuestion() {
     const questionText = createNode('p', { classes: 'question-text', text: questionData.q });
     const optionsContainer = createNode('div', { classes: 'options-container' });
 
-    // Creamos los botones con las respuestas
+    // Creamos los 4 botones de opciones
     questionData.options.forEach((opt, index) => {
         const btn = createNode('button', { text: opt, dataset: { index: index } });
         optionsContainer.appendChild(btn);
     });
 
-    // Usamos una variable para bloquear el clic y que no respondan dos veces
+    // Variable tipo bandera (closure) para evitar que respondan dos veces
     let isAnswerLocked = false; 
 
-    // Delegación de eventos para los botones de respuesta
+    // Delegación de eventos en las respuestas
     optionsContainer.addEventListener('click', (event) => {
-        if (event.target.tagName !== 'BUTTON' || isAnswerLocked) return;
+        // closest() nos asegura pillar el botón aunque pinchen en un icono de su interior
+        const clickedBtn = event.target.closest('button');
         
-        isAnswerLocked = true;
-        const selectedIndex = parseInt(event.target.dataset.index);
+        // Si no es un botón o ya se ha respondido antes, paramos
+        if (!clickedBtn || isAnswerLocked) return;
+        
+        isAnswerLocked = true; 
+        const selectedIndex = parseInt(clickedBtn.dataset.index);
         handleAnswer(selectedIndex, questionData.answer, optionsContainer, timerDisplay);
     });
 
@@ -200,51 +214,62 @@ function renderQuestion() {
     quizContainer.appendChild(optionsContainer);
     appContainer.appendChild(quizContainer);
 
-    // Arrancamos el cronómetro
+    // Cronómetro: se repite cada segundo (1000ms)
     appState.timer = setInterval(() => {
         timeLeft--;
         timerDisplay.textContent = `⏳ Tiempo restante: ${timeLeft}s`;
         
-        // Efecto visual cuando quedan 10 segundos
+        // Efecto visual de pánico en los últimos 10 segundos
         if (timeLeft <= 10) timerDisplay.classList.add('timer-warning');
 
+        // Cuando el tiempo llega a cero
         if (timeLeft <= 0) {
             clearInterval(appState.timer);
             timerDisplay.textContent = "¡Tiempo agotado!";
-            isAnswerLocked = true; // Bloqueamos opciones si se acaba el tiempo
+            isAnswerLocked = true; // Bloqueamos opciones
+            
+            // Mandamos -1 porque el usuario no ha elegido nada
             handleAnswer(-1, questionData.answer, optionsContainer, timerDisplay);
         }
     }, 1000);
 }
 
-// Comprueba la respuesta y pone los colores
+// Evaluar la respuesta elegida y mostrar colores
 function handleAnswer(selectedIndex, correctIndex, containerNode, timerDisplay) {
-    // Paramos el tiempo lo primero
+    // Paramos el tiempo lo primero para evitar errores
     clearInterval(appState.timer);
 
     const buttons = containerNode.querySelectorAll('button');
+    
+    // Comprobación defensiva por si la base de datos se equivocara de índice
+    if (!buttons[correctIndex]) {
+        console.error("Error al buscar la respuesta correcta en el DOM.");
+        return;
+    }
+
+    // Desactivamos todos los botones visualmente
     buttons.forEach(btn => btn.disabled = true);
     
-    // Pintamos la correcta en verde
+    // Siempre le ponemos verde a la correcta
     buttons[correctIndex].classList.add('btn-correct');
 
     if (selectedIndex === correctIndex) {
         appState.score++;
         timerDisplay.textContent = "¡Correcto!";
-    } else if (selectedIndex !== -1) {
-        // Si ha fallado y llegó a pulsar una, la ponemos en rojo
+    } else if (selectedIndex !== -1 && buttons[selectedIndex]) {
+        // Si ha fallado y llegó a pulsar algo (no fue por tiempo), lo pintamos rojo
         buttons[selectedIndex].classList.add('btn-incorrect');
         timerDisplay.textContent = "¡Incorrecto!";
     }
 
-    // Esperamos 2 segundos para ver los colores antes de cambiar de pantalla
+    // Hacemos una pausa de 2 segundos para ver los colores antes de pasar a la siguiente
     setTimeout(() => {
         appState.currentIndex++;
         renderQuestion();
     }, 2000);
 }
 
-// Pantalla final con los resultados
+// Pantalla final
 function renderResults() {
     clearApp();
 
@@ -252,6 +277,7 @@ function renderResults() {
     const title = createNode('h2', { text: '¡Quiz Terminado!' });
     const scoreText = createNode('p', { classes: 'score-text', text: `Has acertado ${appState.score} de ${appState.questions.length} preguntas.` });
     
+    // Llamamos a la función que calcula el mensaje y pinta los efectos
     const feedback = getFeedbackAndRenderParticles();
     
     const btnRestart = createNode('button', { text: 'Volver al Menú' });
@@ -264,11 +290,12 @@ function renderResults() {
     appContainer.appendChild(resultsContainer);
 }
 
-// Muestra el texto final según la nota y llama a las partículas
+// Determinar el mensaje y la animación final según la nota
 function getFeedbackAndRenderParticles() {
     const feedbackNode = createNode('p', { classes: 'feedback-text' });
     const ratio = appState.score / appState.questions.length;
 
+    // Dependiendo del porcentaje de aciertos elegimos un color, texto y animación
     if (ratio === 1) {
         feedbackNode.textContent = '¡Qué genio! Puntuación perfecta.';
         feedbackNode.classList.add('text-perfect');
@@ -290,13 +317,14 @@ function getFeedbackAndRenderParticles() {
     return feedbackNode;
 }
 
-
-// Generamos los divs de los efectos en memoria antes de pasarlos al HTML
+// Crear los nodos de las partículas en memoria temporal (DocumentFragment)
 function generateParticlesFragment(className, count) {
+    // Usamos el fragmento para que la pantalla no parpadee al ir metiendo divs de uno en uno
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < count; i++) {
         const piece = createNode('div', { classes: className });
         
+        // Le damos clases CSS aleatorias de posición y retraso para que caigan natural
         piece.classList.add(`p-${Math.floor(Math.random() * 10) + 1}`);
         piece.classList.add(`d-${Math.floor(Math.random() * 4) + 1}`);
         
@@ -308,18 +336,20 @@ function generateParticlesFragment(className, count) {
     return fragment;
 }
 
-// Pintamos las partículas en el HTML y nos lo guardamos en appState
+// Añadir el fragmento de partículas al DOM
 function mountParticles(className, count) {
     const container = createNode('div', { id: 'fx-container' });
     const fragment = generateParticlesFragment(className, count); 
     
+    // Metemos todo el bloque de golpe al DOM y lo guardamos para luego poder borrarlo
     container.appendChild(fragment);
     appState.fxContainer = container; 
     document.body.appendChild(container);
 }
 
-// Evento para activar y desactivar el modo oscuro con la letra M
+// Listener para el modo oscuro (tecla M)
 function setupDarkModeToggle() {
+    // Escuchamos el teclado en todo el documento para activarlo en cualquier momento
     document.addEventListener('keydown', (event) => {
         if (event.key === 'm' || event.key === 'M') {
             document.body.classList.toggle('dark-mode');
