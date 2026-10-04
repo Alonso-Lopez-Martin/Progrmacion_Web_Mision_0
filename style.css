@@ -8,6 +8,7 @@
     --border-color: #dddddd;
     --transition-speed: 0.3s;
 
+    /* Colores para el feedback visual */
     --correct-bg: #4CAF50;
     --correct-text: #ffffff;
     --incorrect-bg: #f44336;
@@ -28,7 +29,6 @@ body.dark-mode {
     --incorrect-text: #1e1e2e;
 }
 
-/* Reset y estructura general */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -46,22 +46,23 @@ body {
     overflow-x: hidden; 
 }
 
-header, footer {
-    text-align: center;
-    background-color: var(--card-bg);
-    position: relative;
-    z-index: 10; 
-}
-
 header {
+    text-align: center;
     padding: 2rem;
+    background-color: var(--card-bg);
     border-bottom: 2px solid var(--border-color);
+    position: relative;
+    z-index: 10;
 }
 
-footer {
-    padding: 1rem;
-    border-top: 1px solid var(--border-color);
-    font-size: 0.9rem;
+.logo-placeholder {
+    width: 100px;
+    height: 100px;
+    background-color: var(--border-color);
+    border-radius: 50%;
+    object-fit: cover;
+    display: inline-block;
+    margin-bottom: 1rem;
 }
 
 main {
@@ -74,17 +75,17 @@ main {
     position: relative;
 }
 
-/* UI General */
-.logo-placeholder {
-    width: 100px;
-    height: 100px;
-    background-color: var(--border-color);
-    border-radius: 50%;
-    object-fit: cover;
-    display: inline-block;
-    margin-bottom: 1rem;
+footer {
+    text-align: center;
+    padding: 1rem;
+    background-color: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    position: relative;
+    z-index: 10;
 }
 
+/* Botones */
 button {
     background-color: var(--primary-color);
     color: #fff;
@@ -111,7 +112,6 @@ button:disabled {
     opacity: 0.7;
 }
 
-/* Clases dinámicas de feedback */
 .btn-correct {
     background-color: var(--correct-bg) !important;
     color: var(--correct-text) !important;
@@ -127,7 +127,15 @@ button:disabled {
     animation: shake 0.4s ease; 
 }
 
-/* Tarjetas de categorías */
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
+    100% { transform: translateX(0); }
+}
+
+/* Layout de Categorías */
 .categories-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -150,6 +158,17 @@ figure.category-card:hover {
     box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
+/* NUEVA ANIMACIÓN: Giro y encogimiento al pulsar categoría */
+.spin-shrink {
+    animation: spinShrink 0.6s ease-in forwards !important;
+    pointer-events: none; /* Evita doble clic */
+}
+
+@keyframes spinShrink {
+    0% { transform: scale(1) rotate(0deg); opacity: 1; }
+    100% { transform: scale(0) rotate(360deg); opacity: 0; }
+}
+
 figure.category-card img {
     width: 100%;
     height: 150px;
@@ -164,7 +183,7 @@ figure.category-card figcaption {
     font-weight: bold;
 }
 
-/* Contenedores del Quiz */
+/* Layout del Quiz */
 .quiz-container {
     background-color: var(--card-bg);
     padding: 2rem;
@@ -174,6 +193,24 @@ figure.category-card figcaption {
     border: 1px solid var(--border-color);
     position: relative;
     z-index: 10;
+}
+
+.timer-text {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.timer-warning {
+    color: var(--incorrect-bg);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
 }
 
 .options-container {
@@ -187,14 +224,6 @@ figure.category-card figcaption {
     background-color: var(--card-bg);
     color: var(--text-color);
     border: 2px solid var(--primary-color);
-}
-
-/* Tipografía */
-.timer-text {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: var(--primary-color);
-    margin-bottom: 1rem;
 }
 
 .question-text {
@@ -213,14 +242,6 @@ figure.category-card figcaption {
     font-size: 1.5rem;
 }
 
-.text-perfect { color: var(--correct-bg); }
-.text-good { color: #d4af37; }
-body.dark-mode .text-good { color: #f9e2af; }
-.text-regular { color: #e67e22; }
-body.dark-mode .text-regular { color: #fab387; }
-.text-bad { color: var(--incorrect-bg); }
-
-/* Animaciones de UI */
 .fade-in {
     animation: fadeIn 0.4s ease-out forwards;
 }
@@ -230,36 +251,9 @@ body.dark-mode .text-regular { color: #fab387; }
     to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes shake {
-    0% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    50% { transform: translateX(5px); }
-    75% { transform: translateX(-5px); }
-    100% { transform: translateX(0); }
-}
-
-.timer-warning {
-    color: var(--incorrect-bg);
-    animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
-}
-
-.spin-shrink {
-    animation: spinShrink 0.6s ease-in forwards !important;
-    pointer-events: none; 
-}
-
-@keyframes spinShrink {
-    0% { transform: scale(1) rotate(0deg); opacity: 1; }
-    100% { transform: scale(0) rotate(360deg); opacity: 0; }
-}
-
-/* Animaciones de partículas */
+/* =========================================
+   SISTEMA DE PARTÍCULAS
+========================================== */
 #fx-container {
     position: fixed;
     top: 0;
@@ -270,6 +264,7 @@ body.dark-mode .text-regular { color: #fab387; }
     z-index: 1;
 }
 
+/* 0 ACIERTOS: LLUVIA */
 .rain-drop {
     position: absolute;
     top: -20px;
@@ -280,44 +275,42 @@ body.dark-mode .text-regular { color: #fab387; }
 }
 body.dark-mode .rain-drop { background-color: #89b4fa; opacity: 0.6; }
 
+@keyframes fallRain {
+    to { transform: translateY(110vh); }
+}
+
+/* 1 ACIERTO: HOJAS DE OTOÑO */
 .leaf-piece {
     position: absolute;
     top: -20px;
     width: 20px;
     height: 20px;
     background-color: #e67e22;
-    border-radius: 15px 0 15px 0; 
+    border-radius: 15px 0 15px 0; /* Forma de hoja */
     animation: swayLeaf ease-in-out infinite;
 }
 body.dark-mode .leaf-piece { background-color: #fab387; opacity: 0.8; }
 
-.star-piece {
-    position: absolute;
-    bottom: -20px; 
-    width: 20px;
-    height: 20px;
-    background-color: #FFD700;
-    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-    animation: floatStar linear infinite;
-}
-body.dark-mode .star-piece { background-color: #f9e2af; }
-
-.confetti-piece {
-    position: absolute;
-    top: -20px;
-    width: 12px;
-    height: 12px;
-    animation: fallConfetti linear infinite; 
-}
-
-@keyframes fallRain { to { transform: translateY(110vh); } }
-@keyframes fallConfetti { to { transform: translateY(110vh) rotate(720deg); } }
 @keyframes swayLeaf {
     0% { transform: translateY(0) translateX(0) rotate(0deg); }
     33% { transform: translateY(40vh) translateX(50px) rotate(90deg); }
     66% { transform: translateY(80vh) translateX(-50px) rotate(180deg); }
     100% { transform: translateY(120vh) translateX(0) rotate(270deg); }
 }
+
+/* 2 ACIERTOS: ESTRELLAS FLOTANTES */
+.star-piece {
+    position: absolute;
+    bottom: -20px; /* Surgen desde abajo */
+    width: 20px;
+    height: 20px;
+    background-color: #FFD700;
+    /* Crear forma de estrella de 5 puntas usando clip-path */
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    animation: floatStar linear infinite;
+}
+body.dark-mode .star-piece { background-color: #f9e2af; }
+
 @keyframes floatStar {
     0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity: 0; }
     10% { opacity: 1; transform: translateY(-10vh) scale(1) rotate(45deg); }
@@ -325,12 +318,54 @@ body.dark-mode .star-piece { background-color: #f9e2af; }
     100% { transform: translateY(-110vh) scale(1.5) rotate(360deg); opacity: 0; }
 }
 
-/* Modificadores aleatorios para partículas */
-.c-1 { background-color: #f44336; } .c-2 { background-color: #4CAF50; } 
-.c-3 { background-color: #2196F3; } .c-4 { background-color: #FFEB3B; }
+/* 3 ACIERTOS: CONFETI (Ahora es infinito) */
+.confetti-piece {
+    position: absolute;
+    top: -20px;
+    width: 12px;
+    height: 12px;
+    animation: fallConfetti linear infinite; /* Modificado de forwards a infinite */
+}
+
+@keyframes fallConfetti {
+    to { transform: translateY(110vh) rotate(720deg); }
+}
+
+/* Colores de confeti */
+.c-1 { background-color: #f44336; }
+.c-2 { background-color: #4CAF50; }
+.c-3 { background-color: #2196F3; }
+.c-4 { background-color: #FFEB3B; }
+
+/* Posiciones horizontales */
 .p-1 { left: 5%; } .p-2 { left: 15%; } .p-3 { left: 25%; } .p-4 { left: 35%; } .p-5 { left: 45%; }
 .p-6 { left: 55%; } .p-7 { left: 65%; } .p-8 { left: 75%; } .p-9 { left: 85%; } .p-10 { left: 95%; }
+
+/* Velocidades y retrasos ampliadas para más naturalidad */
 .d-1 { animation-duration: 2s; animation-delay: 0s; }
 .d-2 { animation-duration: 3s; animation-delay: 0.5s; }
 .d-3 { animation-duration: 4s; animation-delay: 1s; }
 .d-4 { animation-duration: 5s; animation-delay: 1.5s; }
+
+/* Colores dinámicos para el texto final según la puntuación */
+.text-perfect {
+    color: var(--correct-bg);
+}
+
+.text-good {
+    color: #d4af37; /* Dorado */
+}
+body.dark-mode .text-good {
+    color: #f9e2af; /* Dorado suave para modo oscuro */
+}
+
+.text-regular {
+    color: #e67e22; /* Naranja */
+}
+body.dark-mode .text-regular {
+    color: #fab387; /* Naranja suave para modo oscuro */
+}
+
+.text-bad {
+    color: var(--incorrect-bg);
+}

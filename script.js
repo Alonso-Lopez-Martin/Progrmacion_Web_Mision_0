@@ -41,21 +41,15 @@ const appState = {
 
 const appContainer = document.querySelector('#app-container');
 
+
 // Función de ayuda para crear etiquetas HTML más rápido y no repetir código
 function createNode(tag, options = {}) {
     const el = document.createElement(tag);
-    
-    // Le asignamos los atributos si nos los pasan
     if (options.id) el.id = options.id;
     if (options.classes) el.className = options.classes; 
-    
-    // Comprobamos que no sea undefined para que acepte un 0 o un string vacío sin fallar
-    if (options.text !== undefined) el.textContent = options.text;
-    
+    if (options.text) el.textContent = options.text;
     if (options.src) el.src = options.src;
     if (options.alt) el.alt = options.alt;
-    
-    // Si nos pasan un dataset, lo recorremos y lo añadimos
     if (options.dataset) {
         Object.entries(options.dataset).forEach(([key, value]) => {
             el.dataset[key] = value;
@@ -66,12 +60,11 @@ function createNode(tag, options = {}) {
 
 // Limpiamos el main borrando los hijos uno a uno para evitar usar innerHTML
 function clearApp() {
-    // Mientras haya un primer hijo, lo borramos
     while (appContainer.firstChild) {
         appContainer.removeChild(appContainer.firstChild);
     }
     
-    // Si hay partículas en pantalla, las borramos también para liberar memoria
+    // Si hay partículas en pantalla, las borramos también
     if (appState.fxContainer) {
         appState.fxContainer.remove();
         appState.fxContainer = null;
@@ -117,7 +110,6 @@ function renderCategories() {
         { id: 'entretenimiento', title: 'Entretenimiento', img: 'img/icono_entretenimiento.png' }
     ];
 
-    // Construimos una tarjeta visual para cada tema y la metemos al grid
     themes.forEach(theme => {
         const figure = createNode('figure', { classes: 'category-card', dataset: { categoryId: theme.id } });
         const img = createNode('img', { src: theme.img, alt: `Imagen de ${theme.title}` });
@@ -184,39 +176,22 @@ function renderQuestion() {
     const questionText = createNode('p', { classes: 'question-text', text: questionData.q });
     const optionsContainer = createNode('div', { classes: 'options-container' });
 
-    // Guardamos el texto correcto antes de barajar para saber cuál era la buena
-    const correctText = questionData.options[questionData.answer];
-    
-    // Barajamos las opciones para que no salgan siempre en el mismo sitio
-    const shuffledOptions = shuffleArray(questionData.options);
-    
-    // Buscamos dónde ha caído la respuesta correcta después de barajar
-    const newCorrectIndex = shuffledOptions.indexOf(correctText);
-
-    // Creamos los botones con las respuestas ya mezcladas
-    shuffledOptions.forEach((opt, index) => {
+    // Creamos los botones con las respuestas
+    questionData.options.forEach((opt, index) => {
         const btn = createNode('button', { text: opt, dataset: { index: index } });
         optionsContainer.appendChild(btn);
     });
 
-    // Variable para bloquear el clic y que no respondan dos veces
+    // Usamos una variable para bloquear el clic y que no respondan dos veces
     let isAnswerLocked = false; 
 
     // Delegación de eventos para los botones de respuesta
     optionsContainer.addEventListener('click', (event) => {
-        // Usamos closest('button') para asegurarnos de pillar el clic aunque pongan un icono dentro
-        const clickedBtn = event.target.closest('button');
-        
-        // Si no es un botón o ya se ha respondido antes, paramos
-        if (!clickedBtn || isAnswerLocked) return;
+        if (event.target.tagName !== 'BUTTON' || isAnswerLocked) return;
         
         isAnswerLocked = true;
-        
-        // Convertimos el texto del dataset a número para validar la respuesta
-        const selectedIndex = Number(clickedBtn.dataset.index);
-        
-        // Le pasamos el newCorrectIndex para que valide bien
-        handleAnswer(selectedIndex, newCorrectIndex, optionsContainer, timerDisplay);
+        const selectedIndex = parseInt(event.target.dataset.index);
+        handleAnswer(selectedIndex, questionData.answer, optionsContainer, timerDisplay);
     });
 
     quizContainer.appendChild(title);
@@ -224,9 +199,6 @@ function renderQuestion() {
     quizContainer.appendChild(questionText);
     quizContainer.appendChild(optionsContainer);
     appContainer.appendChild(quizContainer);
-
-    // Limpiamos el intervalo por si hubiera quedado alguno colgado antes de crear uno nuevo
-    clearInterval(appState.timer);
 
     // Arrancamos el cronómetro
     appState.timer = setInterval(() => {
@@ -239,37 +211,29 @@ function renderQuestion() {
         if (timeLeft <= 0) {
             clearInterval(appState.timer);
             timerDisplay.textContent = "¡Tiempo agotado!";
-            isAnswerLocked = true; // Bloqueamos opciones
-            
-            // Mandamos -1 porque no ha pulsado nada
-            handleAnswer(-1, newCorrectIndex, optionsContainer, timerDisplay);
+            isAnswerLocked = true; // Bloqueamos opciones si se acaba el tiempo
+            handleAnswer(-1, questionData.answer, optionsContainer, timerDisplay);
         }
     }, 1000);
 }
 
 // Comprueba la respuesta y pone los colores
 function handleAnswer(selectedIndex, correctIndex, containerNode, timerDisplay) {
-    // Paramos el tiempo lo primero para evitar errores
+    // Paramos el tiempo lo primero
     clearInterval(appState.timer);
 
     const buttons = containerNode.querySelectorAll('button');
     buttons.forEach(btn => btn.disabled = true);
     
-    // Buscamos el botón correcto por su atributo dataset en vez de por el orden en el HTML
-    const correctBtn = containerNode.querySelector(`button[data-index="${correctIndex}"]`);
-    if (correctBtn) {
-        correctBtn.classList.add('btn-correct');
-    }
+    // Pintamos la correcta en verde
+    buttons[correctIndex].classList.add('btn-correct');
 
     if (selectedIndex === correctIndex) {
         appState.score++;
         timerDisplay.textContent = "¡Correcto!";
     } else if (selectedIndex !== -1) {
-        // Buscamos el botón seleccionado también por dataset
-        const selectedBtn = containerNode.querySelector(`button[data-index="${selectedIndex}"]`);
-        if (selectedBtn) {
-            selectedBtn.classList.add('btn-incorrect');
-        }
+        // Si ha fallado y llegó a pulsar una, la ponemos en rojo
+        buttons[selectedIndex].classList.add('btn-incorrect');
         timerDisplay.textContent = "¡Incorrecto!";
     }
 
@@ -288,7 +252,6 @@ function renderResults() {
     const title = createNode('h2', { text: '¡Quiz Terminado!' });
     const scoreText = createNode('p', { classes: 'score-text', text: `Has acertado ${appState.score} de ${appState.questions.length} preguntas.` });
     
-    // Llamamos a la función que calcula el mensaje y pinta los efectos
     const feedback = getFeedbackAndRenderParticles();
     
     const btnRestart = createNode('button', { text: 'Volver al Menú' });
@@ -326,6 +289,7 @@ function getFeedbackAndRenderParticles() {
     
     return feedbackNode;
 }
+
 
 // Generamos los divs de los efectos en memoria antes de pasarlos al HTML
 function generateParticlesFragment(className, count) {
